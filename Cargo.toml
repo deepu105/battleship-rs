@@ -1,0 +1,25 @@
+[package]
+name = "battleship-rs"
+version = "0.1.0"
+authors = ["Deepu K Sasidharan <d4udts@gmail.com>"]
+edition = "2018"
+description = """
+A Star Trek themed battleship game
+"""
+documentation = "https://github.com/deepu105/battleship-rs"
+keywords = ["game", "battleship", "tui"]
+repository = "https://github.com/deepu105/battleship-rs"
+homepage = "https://github.com/deepu105/battleship-rs"
+readme = "README.md"
+license = "MIT"
+exclude = ["assets/*", ".github", "Makefile.toml", "CONTRIBUTING.md", "*.log", "tags"]
+
+
+[dependencies]
+termion = "1.5"
+tui = { version = "0.15", default-features = false, features = ['termion'] }
+
+[[bin]]
+bench = false
+path = "src/main.rs"
+name = "battleship"
