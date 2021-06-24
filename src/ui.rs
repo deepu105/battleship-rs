@@ -1,5 +1,3 @@
-use std::convert::TryFrom;
-
 use tui::{
   backend::Backend,
   layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -9,15 +7,15 @@ use tui::{
 };
 
 use super::{
-  app::{COLUMNS, ROWS},
+  game::{COLUMNS, ROWS},
   App,
 };
 
 const CELL_WIDTH: u16 = 5;
 const CELL_HEIGHT: u16 = 3;
 const PADDING: u16 = 1;
-const GRID_WIDTH: u16 = CELL_WIDTH * COLUMNS + 2 * PADDING;
-const GRID_HEIGHT: u16 = CELL_HEIGHT * ROWS + 2 * PADDING;
+const GRID_WIDTH: u16 = CELL_WIDTH * (COLUMNS as u16) + 2 * PADDING;
+const GRID_HEIGHT: u16 = CELL_HEIGHT * (ROWS as u16) + 2 * PADDING;
 
 pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
   let main_block = Block::default()
@@ -38,7 +36,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     .split(f.size());
 
   let header =
-    Paragraph::new("move: <🠔 🠗 🠕 🠖 | hjkl> | select: <space> | fire: <enter> | quit: <q>")
+    Paragraph::new("move: < 🠔 🠗 🠕 🠖 | hjkl > | select: <space> | fire: <enter> | quit: <q>")
       .style(Style::default().fg(Color::Gray))
       .block(Block::default().borders(Borders::NONE))
       .alignment(Alignment::Center);
@@ -62,7 +60,7 @@ fn draw_board<B: Backend>(
   player_chunk: Rect,
   title: &str,
   app: &mut App,
-  read_only: bool,
+  is_self: bool,
 ) {
   let row_constraints = std::iter::repeat(Constraint::Length(CELL_HEIGHT))
     .take(ROWS.into())
@@ -119,11 +117,8 @@ fn draw_board<B: Backend>(
       .constraints(col_constraints.clone())
       .split(row_rect);
 
-    let r = u16::try_from(r).unwrap();
-
     for (c, cell_rect) in col_rects.into_iter().enumerate() {
-      let c = u16::try_from(c).unwrap();
-      let cell = app.cell((r, c), read_only);
+      let cell = app.cell((r, c), is_self);
       let single_row_text = format!(
         "{:^length$}",
         cell.to_string(),

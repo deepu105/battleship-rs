@@ -16,8 +16,10 @@ exclude = ["assets/*", ".github", "Makefile.toml", "CONTRIBUTING.md", "*.log", "
 
 
 [dependencies]
-termion = "1.5"
 tui = { version = "0.15", default-features = false, features = ['termion'] }
+termion = "1.5"
+rand = "0.8"
+uuid = { version = "0.8", features = ["v4"]}
 
 [[bin]]
 bench = false
