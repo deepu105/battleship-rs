@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{collections::BTreeSet, fmt};
 
 use termion::event::Key;
 use tui::{
@@ -12,9 +12,12 @@ pub struct App {
   pub title: String,
   pub should_quit: bool,
   pub enhanced_graphics: bool,
+  pub message: String,
+  pub clear_alert_countdown: u16,
   game: Game,
   active_column: usize,
   active_row: usize,
+  selected_coordinates: BTreeSet<Coordinate>,
 }
 
 impl App {
@@ -25,57 +28,82 @@ impl App {
       enhanced_graphics,
       active_column: 0,
       active_row: 0,
+      selected_coordinates: BTreeSet::new(),
       game: Game::new(),
+      message: String::default(),
+      clear_alert_countdown: 0,
     }
   }
 
-  pub fn on_up(&mut self) {
+  fn on_up(&mut self) {
     if let Some(active_row) = self.active_row.checked_sub(1) {
       self.active_row = active_row;
     }
   }
 
-  pub fn on_down(&mut self) {
+  fn on_down(&mut self) {
     if self.active_row < ROWS - 1 {
       self.active_row += 1;
     }
   }
 
-  pub fn on_right(&mut self) {
+  fn on_right(&mut self) {
     if self.active_column < COLUMNS - 1 {
       self.active_column += 1;
     }
   }
 
-  pub fn on_left(&mut self) {
+  fn on_left(&mut self) {
     if let Some(active_column) = self.active_column.checked_sub(1) {
       self.active_column = active_column;
     }
   }
 
-  pub fn cell(&self, c: Coordinate, read_only: bool) -> Cell {
-    Cell::new(self, c, read_only)
+  fn on_select(&mut self) {
+    if !self.game.is_won() {
+      if self.is_selected((self.active_row, self.active_column)) {
+        self
+          .selected_coordinates
+          .remove(&(self.active_row, self.active_column));
+      } else if self.is_valid_rule() {
+        self
+          .selected_coordinates
+          .insert((self.active_row, self.active_column));
+      } else {
+        self.message = "Maximum shots for rule selected".into()
+      }
+    }
+  }
+
+  fn on_fire(&mut self) {
+    self.message = if self.selected_coordinates.len() == 0 {
+      "Select opponent coordinates to hit".into()
+    } else if !self.game.is_won() && self.game.is_user_turn() {
+      self.game.fire(&self.selected_coordinates)
+    } else {
+      "Not your turn".into()
+    };
+  }
+
+  fn is_valid_rule(&mut self) -> bool {
+    self.game.is_valid_rule(self.selected_coordinates.len())
+  }
+
+  fn is_selected(&self, coordinate: Coordinate) -> bool {
+    self.selected_coordinates.iter().any(|c| *c == coordinate)
   }
 
   fn active(&self) -> Coordinate {
     (self.active_row, self.active_column)
   }
 
-  //   fn active_cell(&self, read_only: bool) -> Cell {
-  //     self.cell(self.active(), read_only)
-  //   }
+  pub fn is_won(&self) -> bool {
+    self.game.is_won()
+  }
 
-  //   fn expose_active_cell(&mut self) -> Result<bool, Error> {
-  //     self.board.expose(self.active())
-  //   }
-
-  //   fn expose_all(&mut self) -> Result<(), Error> {
-  //     self.board.expose_all()
-  //   }
-
-  //   fn won(&self) -> bool {
-  //     self.board.won()
-  //   }
+  pub fn cell(&self, c: Coordinate, read_only: bool) -> Cell {
+    Cell::new(self, c, read_only)
+  }
 
   pub fn on_key(&mut self, key: Key) {
     match key {
@@ -92,17 +120,15 @@ impl App {
         self.on_right();
       }
       Key::Char(' ') => {
-        // mark cell as selected
+        self.on_select();
       }
-      Key::Char('\n') => {
-        // trigger fire
-      }
+      Key::Char('\n') => self.on_fire(),
       _ => { /* do nothing */ }
     }
   }
 
   pub fn on_tick(&mut self) {
-    // Update progress
+    self.clear_alert_countdown += 1
   }
 }
 
@@ -133,13 +159,16 @@ impl<'app> Cell<'app> {
     if self.read_only {
       false
     } else {
-      self.app.active() == (self.coordinate)
+      self.app.active() == self.coordinate
     }
   }
 
   fn is_selected(&self) -> bool {
-    // self.app.board.tile(self.row, self.column).unwrap().flagged
-    false
+    if self.read_only {
+      false
+    } else {
+      self.app.is_selected(self.coordinate)
+    }
   }
 
   pub fn block(&self) -> Block {
@@ -151,7 +180,7 @@ impl<'app> Cell<'app> {
           .fg(if self.is_active() {
             Color::Cyan
           } else if self.is_selected() {
-            Color::LightCyan
+            Color::Yellow
           } else {
             let position = self.get_position();
             match position.status {
@@ -175,6 +204,8 @@ impl<'app> Cell<'app> {
     let position = self.get_position();
     Style::default().bg(if position.status == Status::SPACE {
       Color::White
+    } else if position.status == Status::LIVE {
+      Color::Green
     } else {
       Color::Black
     })

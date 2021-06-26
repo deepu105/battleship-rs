@@ -3,14 +3,33 @@ mod event;
 mod game;
 mod ui;
 
-use std::{error::Error, io, time::Duration};
+use std::{
+  error::Error,
+  io::{self, stdout, Write},
+  time::Duration,
+};
 
 use app::App;
 use event::{Event, Events};
-use termion::{event::Key, input::MouseTerminal, raw::IntoRawMode, screen::AlternateScreen};
+use termion::{
+  event::Key,
+  input::MouseTerminal,
+  raw::IntoRawMode,
+  screen::{AlternateScreen, ToMainScreen},
+};
 use tui::{backend::TermionBackend, Terminal};
 
 fn main() -> Result<(), Box<dyn Error>> {
+  std::panic::set_hook(Box::new(move |x| {
+    stdout()
+      .into_raw_mode()
+      .unwrap()
+      .suspend_raw_mode()
+      .unwrap();
+    write!(stdout().into_raw_mode().unwrap(), "{}", ToMainScreen).unwrap();
+    write!(stdout(), "{:?}", x).unwrap();
+  }));
+
   // time in ms between two ticks is 250ms.
   let events = Events::new(Duration::from_millis(250));
 

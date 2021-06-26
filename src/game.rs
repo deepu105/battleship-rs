@@ -1,5 +1,5 @@
 use std::{
-  collections::BTreeMap,
+  collections::{BTreeMap, BTreeSet},
   fmt::{self, Display},
   usize,
 };
@@ -28,8 +28,38 @@ impl Game {
     }
   }
 
-  fn player_by_turn(&self, turn: usize) -> &Player {
-    &self.players[turn]
+  fn player_by_turn(&mut self, turn: usize) -> &mut Player {
+    &mut self.players[turn]
+  }
+
+  pub fn fire(&mut self, shots: &BTreeSet<Coordinate>) -> String {
+    let player_index = self.turn;
+    let opponent_index = 1 - player_index;
+    let opponent = self.player_by_turn(opponent_index);
+    let response = opponent.player_board_mut().take_fire(shots);
+
+    let player = self.player_by_turn(player_index);
+    let message = player.opponent_board_mut().update_status(response);
+    self.turn = opponent_index;
+    message
+  }
+
+  pub fn is_user_turn(&self) -> bool {
+    self.turn == 0
+  }
+  pub fn is_won(&self) -> bool {
+    self.winner.is_some()
+  }
+  pub fn is_valid_rule(&self, existing_shots: usize) -> bool {
+    match self.rule {
+      Rule::Default => existing_shots < 1,
+      Rule::SuperCharge => existing_shots < self.player().player_board().ships_alive().len(),
+      Rule::Desperation => {
+        existing_shots
+          <= (self.player().opponent_board().ships.len()
+            - self.player().opponent_board().ships_alive().len())
+      }
+    }
   }
   pub fn player(&self) -> &Player {
     &self.players[0]
@@ -45,7 +75,7 @@ enum Rule {
   Desperation, // not more than number of killed ships + 1
 }
 
-#[derive(Ord, Eq, PartialEq, PartialOrd, Debug)]
+#[derive(Ord, Eq, PartialEq, PartialOrd, Debug, Clone)]
 pub enum Status {
   LIVE,
   MISS,
@@ -66,7 +96,7 @@ impl Status {
   }
   pub fn as_emoji(&self) -> &str {
     match *self {
-      Status::LIVE => "🚢",
+      Status::LIVE => "",
       Status::MISS => "❌",
       Status::HIT => "💥",
       Status::KILL => "💀",
@@ -89,7 +119,6 @@ impl Status {
 pub struct Player {
   is_bot: bool,
   boards: [Board; 2],
-  extra_shots: bool,
 }
 
 impl Player {
@@ -97,10 +126,15 @@ impl Player {
     Self {
       is_bot: false,
       boards: [Board::new(true), Board::new(false)],
-      extra_shots: false,
     }
   }
 
+  pub fn player_board_mut(&mut self) -> &mut Board {
+    &mut self.boards[0]
+  }
+  pub fn opponent_board_mut(&mut self) -> &mut Board {
+    &mut self.boards[1]
+  }
   pub fn player_board(&self) -> &Board {
     &self.boards[0]
   }
@@ -152,9 +186,8 @@ impl Board {
             if !ship.is_overlapping(&positions, start_cords) {
               // draw ship on to board
               if ship.draw(&mut positions, start_cords) {
-                positions[start_cords.0][start_cords.1].ship_id = Some(ship.id.to_owned());
+                ship_placed = true
               }
-              ship_placed = true
             } else {
               ship = Ship::new(s_type.clone());
             }
@@ -186,6 +219,72 @@ impl Board {
       })
       .collect::<Vec<_>>()
   }
+
+  fn ships_alive(&self) -> Vec<&Ship> {
+    self.ships.iter().filter(|s| s.alive).collect::<Vec<_>>()
+  }
+
+  fn find_ship_mut(&mut self, id: String) -> Option<&mut Ship> {
+    self.ships.iter_mut().find(|s| s.id == id)
+  }
+
+  fn alive_pos_by_ship(&self, id: String) -> Vec<&Position> {
+    self
+      .positions
+      .iter()
+      .flat_map(|pr| pr.iter())
+      .filter(|pc| pc.ship_id.is_some() && pc.ship_id.clone().unwrap() == id)
+      .filter(|pc| pc.status == Status::LIVE)
+      .collect::<Vec<_>>()
+  }
+
+  fn take_fire(&mut self, shots: &BTreeSet<Coordinate>) -> BTreeMap<Coordinate, Status> {
+    let mut response = BTreeMap::new();
+    for shot in shots {
+      let pos = self.positions[shot.0][shot.1].clone();
+      let mut status = Status::MISS;
+      if pos.status == Status::LIVE {
+        status = Status::HIT;
+        if let Some(id) = &pos.ship_id {
+          if self.alive_pos_by_ship(id.clone()).len() <= 1 {
+            let ship = self.find_ship_mut(id.clone());
+            if let Some(ship) = ship {
+              status = Status::KILL;
+              ship.alive = false;
+            }
+          }
+        }
+      }
+      self.positions[shot.0][shot.1].status = status.clone();
+      response.insert(*shot, status);
+    }
+    response
+  }
+
+  fn update_status(&mut self, response: BTreeMap<Coordinate, Status>) -> String {
+    let mut kill_count = 0;
+    let mut hit_count = 0;
+    let mut miss_count = 0;
+    for (shot, status) in response {
+      self.positions[shot.0][shot.1].status = status.clone();
+      match status {
+        Status::MISS => miss_count += 1,
+        Status::HIT => hit_count += 1,
+        Status::KILL => kill_count += 1,
+        _ => {}
+      }
+    }
+    let mut msg: Vec<String> = vec!["You have ".into()];
+    if kill_count > 0 {
+      msg.push(format!("{} kill.", kill_count));
+    } else {
+      msg.push(format!("{} hit.", hit_count));
+    }
+    if miss_count > 0 {
+      msg.push(format!(" You missed {}.", miss_count));
+    }
+    msg.join("")
+  }
 }
 
 impl Display for Board {
@@ -195,7 +294,7 @@ impl Display for Board {
   }
 }
 
-#[derive(Ord, Eq, PartialEq, PartialOrd, Debug)]
+#[derive(Ord, Eq, PartialEq, PartialOrd, Debug, Clone)]
 pub struct Position {
   pub status: Status,
   coordinate: Coordinate,
@@ -248,7 +347,7 @@ impl Ship {
     self.ship_type.get_shape(self.rotation)
   }
 
-  fn is_overlapping(&self, positions: &Vec<Vec<Position>>, start_cord: Coordinate) -> bool {
+  fn is_overlapping(&self, positions: &[Vec<Position>], start_cord: Coordinate) -> bool {
     let mut ship_found = false;
     if !positions.is_empty() && !positions[0].is_empty() {
       let mut x = start_cord.0;
@@ -277,6 +376,7 @@ impl Ship {
         for col in row {
           if Status::LIVE == Status::from_char(col) {
             positions[x][y].status = Status::LIVE;
+            positions[x][y].ship_id = Some(self.id.to_owned());
             ship_drawn = true
           }
           y += 1;
@@ -399,17 +499,14 @@ fn transpose(inp: ShipShape) -> ShipShape {
     return inp;
   }
 
-  let rows = inp.len();
-  let cols = inp[0].len();
+  let mut out = inp;
 
-  let mut out = inp.clone();
-
-  for x in 0..rows {
-    for y in 0..cols {
+  for (x, cols) in inp.iter().enumerate() {
+    for (y, _) in cols.iter().enumerate() {
       out[y][x] = inp[x][y];
     }
   }
-  return out;
+  out
 }
 
 /**
@@ -420,16 +517,14 @@ fn reverse_cols_of_rows(inp: ShipShape) -> ShipShape {
     //empty or unset array, nothing do to here
     return inp;
   }
-  let rows = inp.len();
-  let cols = inp[0].len();
-  let mut out = inp.clone();
+  let mut out = inp;
 
-  for x in 0..rows {
-    for y in 0..cols {
-      out[x][cols - y - 1] = inp[x][y];
+  for (x, cols) in inp.iter().enumerate() {
+    for (y, _) in cols.iter().enumerate() {
+      out[x][cols.len() - y - 1] = inp[x][y];
     }
   }
-  return out;
+  out
 }
 
 /**
@@ -441,21 +536,50 @@ fn reverse_rows_of_cols(inp: ShipShape) -> ShipShape {
     return inp;
   }
 
-  let rows = inp.len();
-  let cols = inp[0].len();
-  let mut out = inp.clone();
+  let mut out = inp;
 
-  for x in 0..rows {
-    for y in 0..cols {
-      out[rows - x - 1][y] = inp[x][y];
+  for (x, cols) in inp.iter().enumerate() {
+    for (y, _) in cols.iter().enumerate() {
+      out[inp.len() - x - 1][y] = inp[x][y];
     }
   }
-  return out;
+  out
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
+  #[test]
+  fn test_game_is_valid_rule() {
+    let mut game = Game::new();
+    assert!(game.is_valid_rule(0));
+    assert!(!game.is_valid_rule(1));
+
+    game.rule = Rule::SuperCharge;
+
+    assert!(game.is_valid_rule(0));
+    assert!(game.is_valid_rule(3));
+    assert!(!game.is_valid_rule(4));
+
+    game.rule = Rule::Desperation;
+
+    assert!(game.is_valid_rule(0));
+    assert!(!game.is_valid_rule(1));
+  }
+  #[test]
+  fn test_game_fire() {
+    let mut game = Game::new();
+
+    let mut shots = BTreeSet::new();
+    shots.insert((1, 1));
+    shots.insert((3, 3));
+
+    let msg = game.fire(&shots);
+
+    assert!(!msg.is_empty());
+    assert!(!game.is_user_turn());
+  }
+
   #[test]
   fn test_get_random_coordinate() {
     let mut rng = rand::thread_rng();
@@ -546,8 +670,8 @@ mod tests {
   fn test_ship_is_overlapping() {
     let ship = Ship::new(ShipType::H);
 
-    assert!(!ship.is_overlapping(&vec![], (0, 0)));
-    assert!(!ship.is_overlapping(&vec![vec![]], (0, 0)));
+    assert!(!ship.is_overlapping(&[], (0, 0)));
+    assert!(!ship.is_overlapping(&[vec![]], (0, 0)));
 
     let mut positions = (0..ROWS)
       .map(|r| {
@@ -595,7 +719,7 @@ mod tests {
       })
       .collect::<Vec<_>>()
       .join("\n");
-    assert_eq!(p, "..........\n..........\n..........\n..........\n..........\n.....*.*..\n.....***..\n.....*.*..\n..........\n..........  ");
+    assert_eq!(p, "..........\n..........\n..........\n..........\n..........\n.....*.*..\n.....***..\n.....*.*..\n..........\n..........");
     assert!(ship.is_overlapping(&positions, (5, 5)));
   }
 
@@ -616,16 +740,66 @@ mod tests {
       let found = my_board
         .positions
         .iter()
-        .find(|pr| {
-          pr.iter()
-            .find(|pc| pc.ship_id.is_some() && pc.ship_id.clone().unwrap() == it.id)
-            .is_some()
-        })
-        .and_then(|o| {
-          o.iter()
-            .find(|pc| pc.ship_id.is_some() && pc.ship_id.clone().unwrap() == it.id)
-        });
-      assert!(found.is_some(), "ship not placed!");
+        .flat_map(|pr| pr.iter())
+        .filter(|pc| pc.ship_id.is_some() && pc.ship_id.clone().unwrap() == it.id)
+        .collect::<Vec<_>>();
+      match it.ship_type {
+        ShipType::X => assert!(found.len() == 5, "ship X not placed!"),
+        ShipType::V => assert!(found.len() == 5, "ship V not placed!"),
+        ShipType::H => assert!(found.len() == 7, "ship H not placed!"),
+        ShipType::I => assert!(found.len() == 3, "ship I not placed!"),
+      }
     })
+  }
+
+  #[test]
+  fn test_board_take_fire() {
+    let mut board = Board::new(true);
+
+    board.positions[1][1].status = Status::SPACE;
+    board.positions[3][3].status = Status::LIVE;
+
+    // set a ship as hit except for one position
+    let ship_id = board.ships[0].id.clone();
+    let mut pos = board
+      .positions
+      .iter_mut()
+      .flat_map(|pr| pr.iter_mut())
+      .filter(|pc| pc.ship_id.is_some() && pc.ship_id.clone().unwrap() == ship_id)
+      .collect::<Vec<_>>();
+
+    pos.iter_mut().skip(1).for_each(|p| p.status = Status::HIT);
+
+    let c = pos.iter().take(1).map(|p| p.coordinate).collect::<Vec<_>>();
+
+    let mut shots = BTreeSet::new();
+    shots.insert((1, 1));
+    shots.insert((3, 3));
+    shots.insert(c[0]);
+
+    let res = board.take_fire(&shots);
+    assert_eq!(res.get(&(1, 1)).unwrap(), &Status::MISS);
+    assert_eq!(res.get(&(3, 3)).unwrap(), &Status::HIT);
+    assert_eq!(res.get(&c[0]).unwrap(), &Status::KILL);
+  }
+
+  #[test]
+  fn test_board_update_status() {
+    let mut board = Board::new(false);
+
+    let mut res = BTreeMap::new();
+    res.insert((1, 1), Status::MISS);
+    res.insert((3, 3), Status::HIT);
+    res.insert((0, 2), Status::KILL);
+
+    let message = board.update_status(res);
+    assert_eq!(message, "You have 1 kill. You missed 1.");
+
+    let mut res = BTreeMap::new();
+    res.insert((3, 3), Status::HIT);
+    res.insert((0, 2), Status::HIT);
+
+    let message = board.update_status(res);
+    assert_eq!(message, "You have 2 hit.");
   }
 }

@@ -2,7 +2,7 @@ use tui::{
   backend::Backend,
   layout::{Alignment, Constraint, Direction, Layout, Rect},
   style::{Color, Modifier, Style},
-  widgets::{Block, BorderType, Borders, Paragraph},
+  widgets::{Block, BorderType, Borders, Clear, Paragraph},
   Frame,
 };
 
@@ -35,11 +35,12 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     ])
     .split(f.size());
 
-  let header =
-    Paragraph::new("move: < 🠔 🠗 🠕 🠖 | hjkl > | select: <space> | fire: <enter> | quit: <q>")
-      .style(Style::default().fg(Color::Gray))
-      .block(Block::default().borders(Borders::NONE))
-      .alignment(Alignment::Center);
+  let header = Paragraph::new(
+    "move: < 🠔 🠗 🠕 🠖 | hjkl > | select/unselect: <space> | fire: <enter> | quit: <q>",
+  )
+  .style(Style::default().fg(Color::Gray))
+  .block(Block::default().borders(Borders::NONE))
+  .alignment(Alignment::Center);
 
   f.render_widget(header, v_chunks[2]);
 
@@ -53,6 +54,15 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 
   draw_board(f, player_chunk, "You", app, true);
   draw_board(f, opponent_chunk, "Computer", app, false);
+
+  // show alerts
+  if app.clear_alert_countdown % 8 != 0 || app.is_won() {
+    draw_alert(f, app.message.clone(), v_chunks[1]);
+  } else {
+    // reset messages
+    app.message = String::default();
+    app.clear_alert_countdown = 0;
+  }
 }
 
 fn draw_board<B: Backend>(
@@ -63,10 +73,10 @@ fn draw_board<B: Backend>(
   is_self: bool,
 ) {
   let row_constraints = std::iter::repeat(Constraint::Length(CELL_HEIGHT))
-    .take(ROWS.into())
+    .take(ROWS)
     .collect::<Vec<_>>();
   let col_constraints = std::iter::repeat(Constraint::Length(CELL_WIDTH))
-    .take(COLUMNS.into())
+    .take(COLUMNS)
     .collect::<Vec<_>>();
 
   let horizontal_pad_block_width = (player_chunk.width - GRID_WIDTH) / 2;
@@ -106,7 +116,7 @@ fn draw_board<B: Backend>(
     .direction(Direction::Vertical)
     .vertical_margin(1)
     .horizontal_margin(0)
-    .constraints(row_constraints.clone())
+    .constraints(row_constraints)
     .split(board_rect);
 
   for (r, row_rect) in row_rects.into_iter().enumerate() {
@@ -148,4 +158,69 @@ fn draw_board<B: Backend>(
       f.render_widget(cell_text, cell_rect);
     }
   }
+}
+
+fn draw_alert<B: Backend>(f: &mut Frame<B>, message: String, area: Rect) {
+  if !message.is_empty() {
+    let area = centered_rect(50, 3, area);
+    f.render_widget(Clear, area); //this clears out the background
+    f.render_widget(
+      Paragraph::new(message)
+        .block(
+          Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Thick)
+            .border_style(
+              Style::default()
+                .fg(if true {
+                  Color::Magenta
+                } else {
+                  Color::LightGreen
+                })
+                .add_modifier(Modifier::BOLD),
+            )
+            .style(Style::default().add_modifier(Modifier::BOLD)),
+        )
+        .alignment(Alignment::Center)
+        .style(Style::default()),
+      area,
+    );
+  }
+}
+
+fn centered_rect(width: u16, height: u16, r: Rect) -> Rect {
+  let Rect {
+    width: grid_width,
+    height: grid_height,
+    ..
+  } = r;
+
+  let outer_height = (grid_height / 2)
+    .checked_sub(height / 2)
+    .unwrap_or_default();
+  let popup_layout = Layout::default()
+    .direction(Direction::Vertical)
+    .constraints(
+      [
+        Constraint::Length(outer_height),
+        Constraint::Length(height),
+        Constraint::Length(outer_height),
+      ]
+      .as_ref(),
+    )
+    .split(r);
+
+  let outer_width = (grid_width / 2).checked_sub(width / 2).unwrap_or_default();
+
+  Layout::default()
+    .direction(Direction::Horizontal)
+    .constraints(
+      [
+        Constraint::Length(outer_width),
+        Constraint::Length(width),
+        Constraint::Length(outer_width),
+      ]
+      .as_ref(),
+    )
+    .split(popup_layout[1])[1]
 }
