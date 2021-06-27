@@ -10,7 +10,7 @@ use tui::{
   widgets::{Block, BorderType, Borders},
 };
 
-use super::game::{Coordinate, Difficulty, Game, Rule, Status, COLUMNS, ROWS};
+use super::game::{Coordinate, Difficulty, Game, Rule, Status, COLS, ROWS};
 
 pub struct App {
   pub title: String,
@@ -56,7 +56,7 @@ impl App {
   }
 
   fn on_right(&mut self) {
-    if self.active_column < COLUMNS - 1 {
+    if self.active_column < COLS - 1 {
       self.active_column += 1;
     }
   }
@@ -112,6 +112,10 @@ impl App {
 
   fn active(&self) -> Coordinate {
     (self.active_row, self.active_column)
+  }
+
+  pub fn rule(&self) -> &Rule {
+    &self.game.rule
   }
 
   pub fn elapsed_duration(&self) -> u64 {

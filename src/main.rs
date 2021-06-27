@@ -28,7 +28,7 @@ struct Opt {
   #[structopt(short, long, possible_values = &Rule::variants(), case_insensitive = true, default_value = "Default")]
   pub rule: Rule,
   /// Game rule
-  #[structopt(short, long, possible_values = &Difficulty::variants(), case_insensitive = true, default_value = "Easy")]
+  #[structopt(short, long, possible_values = &Difficulty::variants(), case_insensitive = true, default_value = "Hard")]
   pub difficulty: Difficulty,
 }
 

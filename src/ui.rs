@@ -7,21 +7,26 @@ use tui::{
 };
 
 use super::{
-  game::{COLUMNS, ROWS},
+  game::{COLS, ROWS},
   App,
 };
 
 const CELL_WIDTH: u16 = 5;
 const CELL_HEIGHT: u16 = 3;
 const PADDING: u16 = 1;
-const GRID_WIDTH: u16 = CELL_WIDTH * (COLUMNS as u16) + 2 * PADDING;
+const GRID_WIDTH: u16 = CELL_WIDTH * (COLS as u16) + 2 * PADDING;
 const GRID_HEIGHT: u16 = CELL_HEIGHT * (ROWS as u16) + 2 * PADDING;
 
 pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
   let main_block = Block::default()
     .borders(Borders::ALL)
     .style(Style::default().bg(Color::Black).fg(Color::Cyan))
-    .title(format!("{} ({}s)", app.title, app.elapsed_duration()));
+    .title(format!(
+      "{} | Rule: {} ({}s)",
+      app.title,
+      app.rule(),
+      app.elapsed_duration(),
+    ));
 
   f.render_widget(main_block, f.size());
 
@@ -36,7 +41,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     .split(f.size());
 
   let header = Paragraph::new(
-    "move: < 🠔 🠗 🠕 🠖 | hjkl > | select/unselect: <space> | fire: <enter> | quit: <q>",
+    "move: 🠔 🠗 🠕 🠖 (or) hjkl | select/unselect: <space> | fire: <enter> | quit: <q>",
   )
   .style(Style::default().fg(Color::Gray))
   .block(Block::default().borders(Borders::NONE))
@@ -75,7 +80,7 @@ fn draw_board<B: Backend>(
     .take(ROWS)
     .collect::<Vec<_>>();
   let col_constraints = std::iter::repeat(Constraint::Length(CELL_WIDTH))
-    .take(COLUMNS)
+    .take(COLS)
     .collect::<Vec<_>>();
 
   let horizontal_pad_block_width = (player_chunk.width - GRID_WIDTH) / 2;
