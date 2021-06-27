@@ -35,7 +35,7 @@ jobs:
           command: fmt
           args: --all -- --check
 
-      - name: Build
+      - name: Build project
         uses: actions-rs/cargo@v1
         with:
           command: build
