@@ -8,7 +8,7 @@ name: Publish Docker Image
 
 jobs:
   push_to_registry:
-    name: Push Docker image to Dockerhub
+    name: Build and push Docker image to Dockerhub
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
