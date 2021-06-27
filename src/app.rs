@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, fmt};
+use std::{collections::BTreeSet, fmt, time::Instant};
 
 use termion::event::Key;
 use tui::{
@@ -6,32 +6,36 @@ use tui::{
   widgets::{Block, BorderType, Borders},
 };
 
-use crate::game::{Coordinate, Game, Position, Status, COLUMNS, ROWS};
+use super::game::{Coordinate, Difficulty, Game, Position, Rule, Status, COLUMNS, ROWS};
 
 pub struct App {
   pub title: String,
   pub should_quit: bool,
   pub enhanced_graphics: bool,
   pub message: String,
-  pub clear_alert_countdown: u16,
+  pub frame_count: u16,
+  pub start_time: Instant,
   game: Game,
   active_column: usize,
   active_row: usize,
   selected_coordinates: BTreeSet<Coordinate>,
+  finish_time: Option<Instant>,
 }
 
 impl App {
-  pub fn new(title: String, enhanced_graphics: bool) -> Self {
+  pub fn new(title: String, rule: Rule, difficulty: Difficulty) -> Self {
     App {
       title,
       should_quit: false,
-      enhanced_graphics,
+      enhanced_graphics: true,
       active_column: 0,
       active_row: 0,
       selected_coordinates: BTreeSet::new(),
-      game: Game::new(),
+      game: Game::new(rule, difficulty),
       message: String::default(),
-      clear_alert_countdown: 0,
+      frame_count: 0,
+      start_time: Instant::now(),
+      finish_time: None,
     }
   }
 
@@ -76,13 +80,22 @@ impl App {
   }
 
   fn on_fire(&mut self) {
-    self.message = if self.selected_coordinates.len() == 0 {
+    let msg = if self.selected_coordinates.is_empty() {
       "Select opponent coordinates to hit".into()
     } else if !self.game.is_won() && self.game.is_user_turn() {
-      self.game.fire(&self.selected_coordinates)
+      let msg = self.game.fire(&self.selected_coordinates, false);
+      self.selected_coordinates = BTreeSet::new();
+      msg
     } else {
       "Not your turn".into()
     };
+    // append to previous msg
+    self.message = format!(
+      "{}{}{}",
+      self.message,
+      if self.message.is_empty() { "" } else { "\n" },
+      msg
+    );
   }
 
   fn is_valid_rule(&mut self) -> bool {
@@ -128,7 +141,19 @@ impl App {
   }
 
   pub fn on_tick(&mut self) {
-    self.clear_alert_countdown += 1
+    if self.is_won() && self.finish_time.is_none() {
+      self.finish_time = Some(Instant::now());
+      self.message = format!(
+        "{}\nIn {} seconds",
+        self.message,
+        self.start_time.elapsed().as_secs()
+      );
+    }
+    // computer delays firing by 2 seconds to make the game feel more natural
+    if !self.game.is_user_turn() && !self.is_won() && self.frame_count % 8 == 0 {
+      self.message = self.game.bot_fire();
+    }
+    self.frame_count += 1;
   }
 }
 
@@ -151,7 +176,7 @@ impl<'app> Cell<'app> {
     if self.read_only {
       &self.app.game.player().player_board().positions[self.coordinate.0][self.coordinate.1]
     } else {
-      &self.app.game.opponent().opponent_board().positions[self.coordinate.0][self.coordinate.1]
+      &self.app.game.player().opponent_board().positions[self.coordinate.0][self.coordinate.1]
     }
   }
 

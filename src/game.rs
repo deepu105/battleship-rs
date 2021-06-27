@@ -5,6 +5,7 @@ use std::{
 };
 
 use rand::{prelude::ThreadRng, seq::SliceRandom, Rng};
+use structopt::clap::arg_enum;
 use uuid::Uuid;
 
 pub const ROWS: usize = 10;
@@ -13,18 +14,20 @@ pub const SHIP_SIZE: usize = 3;
 
 pub struct Game {
   players: [Player; 2],
-  winner: Option<Player>,
+  winner: Option<usize>,
   turn: usize,
   rule: Rule,
+  difficulty: Difficulty,
 }
 
 impl Game {
-  pub fn new() -> Self {
+  pub fn new(rule: Rule, difficulty: Difficulty) -> Self {
     Self {
       turn: 0,
       winner: None,
       players: [Player::new(), Player::default()],
-      rule: Rule::Default,
+      rule,
+      difficulty,
     }
   }
 
@@ -32,24 +35,76 @@ impl Game {
     &mut self.players[turn]
   }
 
-  pub fn fire(&mut self, shots: &BTreeSet<Coordinate>) -> String {
+  fn generate_firing_coordinates(&mut self) -> BTreeSet<Coordinate> {
+    let mut rng = rand::thread_rng();
+
+    let number_of_shots = match self.rule {
+      Rule::Default => 1,
+      Rule::SuperCharge => self
+        .player_by_turn(self.turn)
+        .player_board()
+        .ships_alive()
+        .len(),
+      Rule::Desperation => {
+        self.player_by_turn(self.turn).opponent_board().ships.len()
+          - self
+            .player_by_turn(self.turn)
+            .opponent_board()
+            .ships_alive()
+            .len()
+      }
+    };
+
+    let mut shots = BTreeSet::new();
+
+    for _ in 0..number_of_shots {
+      let random_coords = if self.difficulty == Difficulty::Easy {
+        get_random_coordinate(&mut rng, 0)
+      } else {
+        // TODO generate cords based on previous hits, skip missed/hit slots and try slots near previous hits
+        (0, 0)
+      };
+      shots.insert(random_coords);
+    }
+
+    shots
+  }
+
+  pub fn fire(&mut self, shots: &BTreeSet<Coordinate>, bot: bool) -> String {
     let player_index = self.turn;
     let opponent_index = 1 - player_index;
     let opponent = self.player_by_turn(opponent_index);
-    let response = opponent.player_board_mut().take_fire(shots);
+    let opponent_board = opponent.player_board_mut();
+    let (response, lost) = opponent_board.take_fire(shots);
 
     let player = self.player_by_turn(player_index);
-    let message = player.opponent_board_mut().update_status(response);
+    let message = player.opponent_board_mut().update_status(response, bot);
     self.turn = opponent_index;
-    message
+    if lost {
+      self.winner = Some(player_index);
+      if bot {
+        "You lost 🙁".into()
+      } else {
+        "You won 🙌".into()
+      }
+    } else {
+      message
+    }
+  }
+
+  pub fn bot_fire(&mut self) -> String {
+    let shots = self.generate_firing_coordinates();
+    self.fire(&shots, true)
   }
 
   pub fn is_user_turn(&self) -> bool {
     self.turn == 0
   }
+
   pub fn is_won(&self) -> bool {
     self.winner.is_some()
   }
+
   pub fn is_valid_rule(&self, existing_shots: usize) -> bool {
     match self.rule {
       Rule::Default => existing_shots < 1,
@@ -61,18 +116,27 @@ impl Game {
       }
     }
   }
+
   pub fn player(&self) -> &Player {
     &self.players[0]
   }
-  pub fn opponent(&self) -> &Player {
-    &self.players[1]
-  }
 }
 
-enum Rule {
-  Default,     // single shots
-  SuperCharge, // not more than total number of ships alive
-  Desperation, // not more than number of killed ships + 1
+arg_enum! {
+    #[derive(Ord, Eq, PartialEq, PartialOrd, Debug)]
+    pub enum Rule {
+      Default,     // single shots
+      SuperCharge, // not more than total number of ships alive
+      Desperation, // not more than number of killed ships + 1
+    }
+}
+
+arg_enum! {
+    #[derive(Ord, Eq, PartialEq, PartialOrd, Debug)]
+    pub enum Difficulty {
+        Easy, // computer generates random shots
+        Hard, // computer generates shots based on analysis of hit/miss data
+    }
 }
 
 #[derive(Ord, Eq, PartialEq, PartialOrd, Debug, Clone)]
@@ -115,7 +179,7 @@ impl Status {
   }
 }
 
-#[derive(Ord, Eq, PartialEq, PartialOrd)]
+#[derive(Ord, Eq, PartialEq, PartialOrd, Clone)]
 pub struct Player {
   is_bot: bool,
   boards: [Board; 2],
@@ -152,7 +216,7 @@ impl Default for Player {
   }
 }
 
-#[derive(Ord, Eq, PartialEq, PartialOrd)]
+#[derive(Ord, Eq, PartialEq, PartialOrd, Clone)]
 pub struct Board {
   pub positions: Vec<Vec<Position>>,
   ships: Vec<Ship>,
@@ -182,7 +246,7 @@ impl Board {
           // doing this in a while loop is sub optimal as this is causing
           // infinite loop if number of ships are more than 4 currently
           while !ship_placed {
-            let start_cords = get_random_coordinate(&mut rng);
+            let start_cords = get_random_coordinate(&mut rng, SHIP_SIZE);
             if !ship.is_overlapping(&positions, start_cords) {
               // draw ship on to board
               if ship.draw(&mut positions, start_cords) {
@@ -238,7 +302,7 @@ impl Board {
       .collect::<Vec<_>>()
   }
 
-  fn take_fire(&mut self, shots: &BTreeSet<Coordinate>) -> BTreeMap<Coordinate, Status> {
+  fn take_fire(&mut self, shots: &BTreeSet<Coordinate>) -> (BTreeMap<Coordinate, Status>, bool) {
     let mut response = BTreeMap::new();
     for shot in shots {
       let pos = self.positions[shot.0][shot.1].clone();
@@ -255,18 +319,23 @@ impl Board {
           }
         }
       }
-      self.positions[shot.0][shot.1].status = status.clone();
+      if pos.status != Status::HIT && pos.status != Status::KILL {
+        self.positions[shot.0][shot.1].status = status.clone();
+      }
       response.insert(*shot, status);
     }
-    response
+    (response, self.ships_alive().is_empty())
   }
 
-  fn update_status(&mut self, response: BTreeMap<Coordinate, Status>) -> String {
+  fn update_status(&mut self, response: BTreeMap<Coordinate, Status>, bot: bool) -> String {
     let mut kill_count = 0;
     let mut hit_count = 0;
     let mut miss_count = 0;
     for (shot, status) in response {
-      self.positions[shot.0][shot.1].status = status.clone();
+      let mut pos = &mut self.positions[shot.0][shot.1];
+      if pos.status != Status::HIT && pos.status != Status::KILL {
+        pos.status = status.clone();
+      }
       match status {
         Status::MISS => miss_count += 1,
         Status::HIT => hit_count += 1,
@@ -274,14 +343,22 @@ impl Board {
         _ => {}
       }
     }
-    let mut msg: Vec<String> = vec!["You have ".into()];
+    let mut msg: Vec<String> = if bot {
+      vec!["Computer have ".into()]
+    } else {
+      vec!["You have ".into()]
+    };
     if kill_count > 0 {
-      msg.push(format!("{} kill.", kill_count));
+      msg.push(format!("sunk {} ship.", kill_count));
     } else {
       msg.push(format!("{} hit.", hit_count));
     }
     if miss_count > 0 {
-      msg.push(format!(" You missed {}.", miss_count));
+      msg.push(format!(
+        " {} missed {}.",
+        if bot { "Computer" } else { "You" },
+        miss_count
+      ));
     }
     msg.join("")
   }
@@ -319,7 +396,7 @@ impl Display for Position {
 
 pub type Coordinate = (usize, usize);
 
-#[derive(Ord, Eq, PartialEq, PartialOrd)]
+#[derive(Ord, Eq, PartialEq, PartialOrd, Clone)]
 struct Ship {
   //   coordinate: Coordinate,
   //   positions: BTreeSet<Position>,
@@ -484,10 +561,10 @@ impl ShipType {
   }
 }
 
-fn get_random_coordinate(rng: &mut ThreadRng) -> Coordinate {
+fn get_random_coordinate(rng: &mut ThreadRng, threshold: usize) -> Coordinate {
   (
-    rng.gen_range(0..(ROWS - SHIP_SIZE)),
-    rng.gen_range(0..(COLUMNS - SHIP_SIZE)),
+    rng.gen_range(0..(ROWS - threshold)),
+    rng.gen_range(0..(COLUMNS - threshold)),
   )
 }
 /**
@@ -551,7 +628,7 @@ mod tests {
   use super::*;
   #[test]
   fn test_game_is_valid_rule() {
-    let mut game = Game::new();
+    let mut game = Game::new(Rule::Default, Difficulty::Easy);
     assert!(game.is_valid_rule(0));
     assert!(!game.is_valid_rule(1));
 
@@ -568,22 +645,23 @@ mod tests {
   }
   #[test]
   fn test_game_fire() {
-    let mut game = Game::new();
+    let mut game = Game::new(Rule::Default, Difficulty::Easy);
 
     let mut shots = BTreeSet::new();
     shots.insert((1, 1));
     shots.insert((3, 3));
 
-    let msg = game.fire(&shots);
+    let msg = game.fire(&shots, false);
 
     assert!(!msg.is_empty());
     assert!(!game.is_user_turn());
+    assert!(!game.winner.is_some());
   }
 
   #[test]
   fn test_get_random_coordinate() {
     let mut rng = rand::thread_rng();
-    assert!(get_random_coordinate(&mut rng) < (ROWS, COLUMNS));
+    assert!(get_random_coordinate(&mut rng, SHIP_SIZE) < (ROWS, COLUMNS));
   }
   #[test]
   fn test_reverse_rows_of_cols() {
@@ -777,10 +855,11 @@ mod tests {
     shots.insert((3, 3));
     shots.insert(c[0]);
 
-    let res = board.take_fire(&shots);
+    let (res, lost) = board.take_fire(&shots);
     assert_eq!(res.get(&(1, 1)).unwrap(), &Status::MISS);
     assert_eq!(res.get(&(3, 3)).unwrap(), &Status::HIT);
     assert_eq!(res.get(&c[0]).unwrap(), &Status::KILL);
+    assert!(!lost);
   }
 
   #[test]
@@ -792,14 +871,16 @@ mod tests {
     res.insert((3, 3), Status::HIT);
     res.insert((0, 2), Status::KILL);
 
-    let message = board.update_status(res);
-    assert_eq!(message, "You have 1 kill. You missed 1.");
+    let message = board.update_status(res, false);
+    assert_eq!(message, "You have sunk 1 ship. You missed 1.");
 
     let mut res = BTreeMap::new();
     res.insert((3, 3), Status::HIT);
     res.insert((0, 2), Status::HIT);
 
-    let message = board.update_status(res);
+    let message = board.update_status(res.clone(), false);
     assert_eq!(message, "You have 2 hit.");
+    let message = board.update_status(res, true);
+    assert_eq!(message, "Computer have 2 hit.");
   }
 }

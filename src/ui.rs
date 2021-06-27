@@ -21,7 +21,11 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
   let main_block = Block::default()
     .borders(Borders::ALL)
     .style(Style::default().bg(Color::Black).fg(Color::Cyan))
-    .title(app.title.as_ref());
+    .title(format!(
+      "{} ({}s)",
+      app.title,
+      app.start_time.elapsed().as_secs()
+    ));
 
   f.render_widget(main_block, f.size());
 
@@ -56,12 +60,11 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
   draw_board(f, opponent_chunk, "Computer", app, false);
 
   // show alerts
-  if app.clear_alert_countdown % 8 != 0 || app.is_won() {
+  if app.frame_count % 8 != 0 || app.is_won() {
     draw_alert(f, app.message.clone(), v_chunks[1]);
   } else {
     // reset messages
     app.message = String::default();
-    app.clear_alert_countdown = 0;
   }
 }
 
@@ -162,7 +165,7 @@ fn draw_board<B: Backend>(
 
 fn draw_alert<B: Backend>(f: &mut Frame<B>, message: String, area: Rect) {
   if !message.is_empty() {
-    let area = centered_rect(50, 3, area);
+    let area = centered_rect(50, 4, area);
     f.render_widget(Clear, area); //this clears out the background
     f.render_widget(
       Paragraph::new(message)
