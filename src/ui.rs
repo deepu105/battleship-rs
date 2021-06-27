@@ -21,11 +21,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
   let main_block = Block::default()
     .borders(Borders::ALL)
     .style(Style::default().bg(Color::Black).fg(Color::Cyan))
-    .title(format!(
-      "{} ({}s)",
-      app.title,
-      app.start_time.elapsed().as_secs()
-    ));
+    .title(format!("{} ({}s)", app.title, app.elapsed_duration()));
 
   f.render_widget(main_block, f.size());
 

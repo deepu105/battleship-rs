@@ -292,13 +292,24 @@ impl Board {
     self.ships.iter_mut().find(|s| s.id == id)
   }
 
+  fn find_ship(&self, id: String) -> Option<&Ship> {
+    self.ships.iter().find(|s| s.id == id)
+  }
+
   fn alive_pos_by_ship(&self, id: String) -> Vec<&Position> {
+    self
+      .pos_by_ship(id)
+      .into_iter()
+      .filter(|pc| pc.status == Status::LIVE)
+      .collect::<Vec<_>>()
+  }
+
+  fn pos_by_ship(&self, id: String) -> Vec<&Position> {
     self
       .positions
       .iter()
       .flat_map(|pr| pr.iter())
       .filter(|pc| pc.ship_id.is_some() && pc.ship_id.clone().unwrap() == id)
-      .filter(|pc| pc.status == Status::LIVE)
       .collect::<Vec<_>>()
   }
 
@@ -315,6 +326,10 @@ impl Board {
             if let Some(ship) = ship {
               status = Status::KILL;
               ship.alive = false;
+              let pos = self.pos_by_ship(id.clone());
+              pos.iter().for_each(|p| {
+                response.insert(p.coordinate, status.clone());
+              });
             }
           }
         }
@@ -333,7 +348,7 @@ impl Board {
     let mut miss_count = 0;
     for (shot, status) in response {
       let mut pos = &mut self.positions[shot.0][shot.1];
-      if pos.status != Status::HIT && pos.status != Status::KILL {
+      if pos.status == Status::SPACE || pos.status == Status::LIVE || status == Status::KILL {
         pos.status = status.clone();
       }
       match status {
@@ -362,6 +377,15 @@ impl Board {
     }
     msg.join("")
   }
+
+  pub fn find_position_and_ship(&self, coordinate: Coordinate) -> (&Position, Option<&Ship>) {
+    let pos = &self.positions[coordinate.0][coordinate.1];
+    if pos.ship_id.is_some() {
+      (pos, self.find_ship(pos.ship_id.clone().unwrap()))
+    } else {
+      (pos, None)
+    }
+  }
 }
 
 impl Display for Board {
@@ -373,7 +397,7 @@ impl Display for Board {
 
 #[derive(Ord, Eq, PartialEq, PartialOrd, Debug, Clone)]
 pub struct Position {
-  pub status: Status,
+  status: Status,
   coordinate: Coordinate,
   ship_id: Option<String>,
 }
@@ -384,6 +408,14 @@ impl Position {
       coordinate,
       status: Status::SPACE,
       ship_id: None,
+    }
+  }
+
+  pub fn get_status(&self, ship: Option<&Ship>) -> Status {
+    if ship.is_some() && !ship.unwrap().alive {
+      Status::KILL
+    } else {
+      self.status.clone()
     }
   }
 }
@@ -397,9 +429,7 @@ impl Display for Position {
 pub type Coordinate = (usize, usize);
 
 #[derive(Ord, Eq, PartialEq, PartialOrd, Clone)]
-struct Ship {
-  //   coordinate: Coordinate,
-  //   positions: BTreeSet<Position>,
+pub struct Ship {
   id: String,
   rotation: u16,
   alive: bool,
@@ -411,8 +441,6 @@ const ROTATIONS: [u16; 4] = [90, 180, 270, 360];
 impl Ship {
   fn new(ship_type: ShipType) -> Self {
     Self {
-      //   coordinate: (0, 0),
-      //   positions: (),
       id: Uuid::new_v4().to_string(),
       rotation: ROTATIONS.choose(&mut rand::thread_rng()).map_or(0, |r| *r),
       alive: true,

@@ -1,4 +1,8 @@
-use std::{collections::BTreeSet, fmt, time::Instant};
+use std::{
+  collections::BTreeSet,
+  fmt,
+  time::{Duration, Instant},
+};
 
 use termion::event::Key;
 use tui::{
@@ -6,7 +10,7 @@ use tui::{
   widgets::{Block, BorderType, Borders},
 };
 
-use super::game::{Coordinate, Difficulty, Game, Position, Rule, Status, COLUMNS, ROWS};
+use super::game::{Coordinate, Difficulty, Game, Rule, Status, COLUMNS, ROWS};
 
 pub struct App {
   pub title: String,
@@ -19,7 +23,7 @@ pub struct App {
   active_column: usize,
   active_row: usize,
   selected_coordinates: BTreeSet<Coordinate>,
-  finish_time: Option<Instant>,
+  duration: Option<Duration>,
 }
 
 impl App {
@@ -35,7 +39,7 @@ impl App {
       message: String::default(),
       frame_count: 0,
       start_time: Instant::now(),
-      finish_time: None,
+      duration: None,
     }
   }
 
@@ -110,6 +114,14 @@ impl App {
     (self.active_row, self.active_column)
   }
 
+  pub fn elapsed_duration(&self) -> u64 {
+    if let Some(duration) = self.duration {
+      duration.as_secs()
+    } else {
+      self.start_time.elapsed().as_secs()
+    }
+  }
+
   pub fn is_won(&self) -> bool {
     self.game.is_won()
   }
@@ -141,13 +153,10 @@ impl App {
   }
 
   pub fn on_tick(&mut self) {
-    if self.is_won() && self.finish_time.is_none() {
-      self.finish_time = Some(Instant::now());
-      self.message = format!(
-        "{}\nIn {} seconds",
-        self.message,
-        self.start_time.elapsed().as_secs()
-      );
+    if self.is_won() && self.duration.is_none() {
+      let duration = self.start_time.elapsed();
+      self.duration = Some(duration);
+      self.message = format!("{} (In {} seconds)", self.message, duration.as_secs());
     }
     // computer delays firing by 2 seconds to make the game feel more natural
     if !self.game.is_user_turn() && !self.is_won() && self.frame_count % 8 == 0 {
@@ -172,12 +181,24 @@ impl<'app> Cell<'app> {
     }
   }
 
-  fn get_position(&self) -> &Position {
-    if self.read_only {
-      &self.app.game.player().player_board().positions[self.coordinate.0][self.coordinate.1]
+  fn get_position_status(&self) -> Status {
+    let (pos, ship) = if self.read_only {
+      self
+        .app
+        .game
+        .player()
+        .player_board()
+        .find_position_and_ship(self.coordinate)
     } else {
-      &self.app.game.player().opponent_board().positions[self.coordinate.0][self.coordinate.1]
-    }
+      self
+        .app
+        .game
+        .player()
+        .opponent_board()
+        .find_position_and_ship(self.coordinate)
+    };
+
+    pos.get_status(ship)
   }
 
   fn is_active(&self) -> bool {
@@ -207,12 +228,12 @@ impl<'app> Cell<'app> {
           } else if self.is_selected() {
             Color::Yellow
           } else {
-            let position = self.get_position();
-            match position.status {
+            let status = self.get_position_status();
+            match status {
               Status::LIVE => Color::Green,
-              Status::MISS => Color::Yellow,
               Status::HIT => Color::LightRed,
               Status::KILL => Color::Red,
+              Status::MISS => Color::White,
               Status::SPACE => Color::White,
             }
           })
@@ -226,10 +247,10 @@ impl<'app> Cell<'app> {
   }
 
   pub fn text_style(&self) -> Style {
-    let position = self.get_position();
-    Style::default().bg(if position.status == Status::SPACE {
+    let status = self.get_position_status();
+    Style::default().bg(if status == Status::SPACE {
       Color::White
-    } else if position.status == Status::LIVE {
+    } else if status == Status::LIVE {
       Color::Green
     } else {
       Color::Black
@@ -239,8 +260,8 @@ impl<'app> Cell<'app> {
 
 impl fmt::Display for Cell<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let position = self.get_position();
+    let status = self.get_position_status();
 
-    write!(f, "{}", position.status.as_emoji())
+    write!(f, "{}", status.as_emoji())
   }
 }

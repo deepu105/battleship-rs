@@ -1,16 +1,20 @@
 VERSION  := latest
-IMG_NAME := deepu105/kdash
+IMG_NAME := deepu105/battleship
 IMAGE    := ${IMG_NAME}:${VERSION}
 
 default: run
 
- ## Run all tests - `cargo install cargo-tarpaulin`
+ ## Run all tests
 test:  
-	@cargo check && cargo tarpaulin
+	@cargo test
+
+ ## Run all tests with coverage- `cargo install cargo-tarpaulin`
+test-cov:  
+	@cargo tarpaulin
 
 ## Builds the app for current os-arch
 build:  
-	@make test && cargo clean && cargo build --release
+	@make test && cargo build --release
 
 ## Runs the app
 run:  
@@ -20,10 +24,6 @@ run:
 lint:  
 	@find . | grep '\.\/src\/.*\.rs$$' | xargs touch && cargo clippy --all-targets --workspace
 
-## Force Run clippy
-lint-force:  
-	@cargo clean && cargo clippy
-
 ## Fix lint
 lint-fix:  
 	@cargo fix
@@ -31,6 +31,14 @@ lint-fix:
 ## Run format
 fmt:  
 	@cargo fmt
+
+## Build a Docker Image
+docker:    
+	@DOCKER_BUILDKIT=1 docker build --rm -t ${IMAGE} .
+
+## Run Docker Image locally
+docker-run:    
+	@docker run --rm ${IMAGE}
 
 ## Analyse for unsafe usage - `cargo install cargo-geiger`
 analyse:  
