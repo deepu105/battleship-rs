@@ -34,3 +34,5 @@ You can also clone the repo and run `cargo run`
 **Note**: Works only in Linux/Mac for Windows use docker command above.
 
 **TODO**: Make this work also in web assembly
+
+UI inspired from https://github.com/cpcloud/minesweep-rs
