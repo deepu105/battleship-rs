@@ -14,6 +14,23 @@ pub const SHIP_SIZE: usize = 3;
 
 type FiringResponse = BTreeMap<Coordinate, Status>;
 
+arg_enum! {
+    #[derive(Ord, Eq, PartialEq, PartialOrd, Debug)]
+    pub enum Rule {
+      Default, // single shots
+      Fury,    // not more than total number of ships alive
+      Charge,  // not more than number of killed ships + 1
+    }
+}
+
+arg_enum! {
+    #[derive(Ord, Eq, PartialEq, PartialOrd, Debug)]
+    pub enum Difficulty {
+        Easy, // computer generates random shots without previous ones
+        Hard, // computer generates shots based on analysis of hit/miss  data
+    }
+}
+
 pub struct Game {
   pub rule: Rule,
   difficulty: Difficulty,
@@ -162,23 +179,6 @@ impl Game {
   pub fn computer(&self) -> &Player {
     &self.players[1]
   }
-}
-
-arg_enum! {
-    #[derive(Ord, Eq, PartialEq, PartialOrd, Debug)]
-    pub enum Rule {
-      Default, // single shots
-      Fury,    // not more than total number of ships alive
-      Charge,  // not more than number of killed ships + 1
-    }
-}
-
-arg_enum! {
-    #[derive(Ord, Eq, PartialEq, PartialOrd, Debug)]
-    pub enum Difficulty {
-        Easy, // computer generates random shots without previous ones
-        Hard, // computer generates shots based on analysis of hit/miss  data
-    }
 }
 
 #[derive(Ord, Eq, PartialEq, PartialOrd, Debug, Clone)]
@@ -409,7 +409,7 @@ impl Board {
       vec!["You have ".into()]
     };
     if kill_count > 0 {
-      msg.push(format!("sunk a ship."));
+      msg.push("sunk a ship.".to_string());
     } else {
       msg.push(format!("{} hit.", hit_count));
     }
@@ -501,7 +501,7 @@ impl Ship {
     let mut ship_found = false;
     if !positions.is_empty() && !positions[0].is_empty() {
       let mut x = start_cord.0;
-      for row in self.shape() {
+      for row in &self.shape() {
         let mut y = start_cord.1;
         for _ in row {
           if positions[x][y].status == Status::LIVE {
@@ -521,10 +521,10 @@ impl Ship {
       let shape = self.shape();
 
       let mut x = start_cord.0;
-      for row in shape {
+      for row in &shape {
         let mut y = start_cord.1;
         for col in row {
-          if Status::LIVE == Status::from_char(col) {
+          if Status::LIVE == Status::from_char(*col) {
             positions[x][y].status = Status::LIVE;
             positions[x][y].ship_id = Some(self.id.to_owned());
             ship_drawn = true
