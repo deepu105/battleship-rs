@@ -10,8 +10,12 @@ use uuid::Uuid;
 
 pub const ROWS: usize = 10;
 pub const COLS: usize = 10;
-pub const SHIP_SIZE: usize = 3;
+const SHIP_SIZE: usize = 3;
+const POS_ADDITION: [i32; 5] = [-2, -1, 0, 1, 2];
+const ROTATIONS: [u16; 4] = [90, 180, 270, 360];
 
+pub type Coordinate = (usize, usize);
+type ShipShape = [[Status; SHIP_SIZE]; SHIP_SIZE];
 type FiringResponse = BTreeMap<Coordinate, Status>;
 
 arg_enum! {
@@ -96,9 +100,8 @@ impl Game {
             .choose(&mut rng)
             .map_or((0, 0), |r| r.coordinate);
 
-          let add: [i32; 5] = [-2, -1, 0, 1, 2];
-          let x_addition = add.choose(&mut rng).unwrap_or(&0);
-          let y_addition = add.choose(&mut rng).unwrap_or(&0);
+          let x_addition = POS_ADDITION.choose(&mut rng).unwrap_or(&0);
+          let y_addition = POS_ADDITION.choose(&mut rng).unwrap_or(&0);
           let x = (coord.0 as i32) + x_addition;
           let y = (coord.1 as i32) + y_addition;
           let x = if x >= ROWS as i32 || x < 0 {
@@ -453,8 +456,6 @@ impl Display for Position {
   }
 }
 
-pub type Coordinate = (usize, usize);
-
 #[derive(PartialEq, Clone)]
 pub struct Ship {
   id: String,
@@ -462,8 +463,6 @@ pub struct Ship {
   alive: bool,
   ship_type: ShipType,
 }
-
-const ROTATIONS: [u16; 4] = [90, 180, 270, 360];
 
 impl Ship {
   fn new(ship_type: ShipType) -> Self {
@@ -527,8 +526,6 @@ enum ShipType {
   H,
   I,
 }
-
-type ShipShape = [[Status; SHIP_SIZE]; SHIP_SIZE];
 
 impl ShipType {
   fn get_shape(&self, rotation: u16) -> ShipShape {
