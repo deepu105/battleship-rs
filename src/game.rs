@@ -15,7 +15,7 @@ pub const SHIP_SIZE: usize = 3;
 type FiringResponse = BTreeMap<Coordinate, Status>;
 
 arg_enum! {
-    #[derive(Ord, Eq, PartialEq, PartialOrd, Debug)]
+    #[derive(Debug)]
     pub enum Rule {
       Default, // single shots
       Fury,    // not more than total number of ships alive
@@ -24,7 +24,7 @@ arg_enum! {
 }
 
 arg_enum! {
-    #[derive(Ord, Eq, PartialEq, PartialOrd, Debug)]
+    #[derive(PartialEq, Debug)]
     pub enum Difficulty {
         Easy, // computer generates random shots without previous ones
         Hard, // computer generates shots based on analysis of hit/miss  data
@@ -181,7 +181,7 @@ impl Game {
   }
 }
 
-#[derive(Ord, Eq, PartialEq, PartialOrd, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Status {
   Live,
   Miss,
@@ -190,38 +190,20 @@ pub enum Status {
   Space,
 }
 
-impl Status {
-  pub fn as_char(&self) -> char {
-    match *self {
-      Status::Live => '*',
-      Status::Miss => '-',
-      Status::Hit => 'X',
-      Status::Kill => 'K',
-      Status::Space => '.',
-    }
-  }
-  pub fn as_emoji(&self) -> &str {
-    match *self {
+impl Display for Status {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    let s = match *self {
       Status::Live => "🚀",
       Status::Miss => "❌",
       Status::Hit => "💥",
       Status::Kill => "💀",
-      Status::Space => "",
-    }
-  }
-  pub fn from_char(c: char) -> Self {
-    match c {
-      '*' => Status::Live,
-      '-' => Status::Miss,
-      'X' => Status::Hit,
-      'K' => Status::Kill,
-      '.' => Status::Space,
-      _ => panic!("char is not a valid Status"),
-    }
+      Status::Space => " ",
+    };
+    write!(f, "{}", s)
   }
 }
 
-#[derive(Ord, Eq, PartialEq, PartialOrd, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct Player {
   is_bot: bool,
   boards: [Board; 2],
@@ -258,7 +240,7 @@ impl Default for Player {
   }
 }
 
-#[derive(Ord, Eq, PartialEq, PartialOrd, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct Board {
   pub positions: Vec<Vec<Position>>,
   ships: Vec<Ship>,
@@ -373,14 +355,14 @@ impl Board {
               ship.alive = false;
               let pos = self.pos_by_ship(id.clone());
               pos.iter().for_each(|p| {
-                response.insert(p.coordinate, status.clone());
+                response.insert(p.coordinate, status);
               });
             }
           }
         }
       }
       if pos.status != Status::Hit && pos.status != Status::Kill {
-        self.positions[shot.0][shot.1].status = status.clone();
+        self.positions[shot.0][shot.1].status = status;
       }
       response.insert(*shot, status);
     }
@@ -394,7 +376,7 @@ impl Board {
     for (shot, status) in response {
       let mut pos = &mut self.positions[shot.0][shot.1];
       if pos.status == Status::Space || pos.status == Status::Live || status == Status::Kill {
-        pos.status = status.clone();
+        pos.status = status;
       }
       match status {
         Status::Miss => miss_count += 1,
@@ -440,7 +422,7 @@ impl Display for Board {
   }
 }
 
-#[derive(Ord, Eq, PartialEq, PartialOrd, Debug, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct Position {
   status: Status,
   coordinate: Coordinate,
@@ -460,20 +442,20 @@ impl Position {
     if ship.is_some() && !ship.unwrap().alive {
       Status::Kill
     } else {
-      self.status.clone()
+      self.status
     }
   }
 }
 
 impl Display for Position {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{}", self.status.as_char())
+    write!(f, "{}", self.status)
   }
 }
 
 pub type Coordinate = (usize, usize);
 
-#[derive(Ord, Eq, PartialEq, PartialOrd, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct Ship {
   id: String,
   rotation: u16,
@@ -524,7 +506,7 @@ impl Ship {
       for row in &shape {
         let mut y = start_cord.1;
         for col in row {
-          if Status::Live == Status::from_char(*col) {
+          if Status::Live == *col {
             positions[x][y].status = Status::Live;
             positions[x][y].ship_id = Some(self.id.to_owned());
             ship_drawn = true
@@ -538,7 +520,7 @@ impl Ship {
   }
 }
 
-#[derive(Clone, Ord, Eq, PartialEq, PartialOrd)]
+#[derive(Clone, PartialEq)]
 enum ShipType {
   X,
   V,
@@ -546,78 +528,30 @@ enum ShipType {
   I,
 }
 
-type ShipShape = [[char; SHIP_SIZE]; SHIP_SIZE];
+type ShipShape = [[Status; SHIP_SIZE]; SHIP_SIZE];
 
 impl ShipType {
   fn get_shape(&self, rotation: u16) -> ShipShape {
     let shape = match *self {
       ShipType::X => [
-        [
-          Status::Live.as_char(),
-          Status::Space.as_char(),
-          Status::Live.as_char(),
-        ],
-        [
-          Status::Space.as_char(),
-          Status::Live.as_char(),
-          Status::Space.as_char(),
-        ],
-        [
-          Status::Live.as_char(),
-          Status::Space.as_char(),
-          Status::Live.as_char(),
-        ],
+        [Status::Live, Status::Space, Status::Live],
+        [Status::Space, Status::Live, Status::Space],
+        [Status::Live, Status::Space, Status::Live],
       ],
       ShipType::V => [
-        [
-          Status::Live.as_char(),
-          Status::Space.as_char(),
-          Status::Live.as_char(),
-        ],
-        [
-          Status::Live.as_char(),
-          Status::Space.as_char(),
-          Status::Live.as_char(),
-        ],
-        [
-          Status::Space.as_char(),
-          Status::Live.as_char(),
-          Status::Space.as_char(),
-        ],
+        [Status::Live, Status::Space, Status::Live],
+        [Status::Live, Status::Space, Status::Live],
+        [Status::Space, Status::Live, Status::Space],
       ],
       ShipType::H => [
-        [
-          Status::Live.as_char(),
-          Status::Space.as_char(),
-          Status::Live.as_char(),
-        ],
-        [
-          Status::Live.as_char(),
-          Status::Live.as_char(),
-          Status::Live.as_char(),
-        ],
-        [
-          Status::Live.as_char(),
-          Status::Space.as_char(),
-          Status::Live.as_char(),
-        ],
+        [Status::Live, Status::Space, Status::Live],
+        [Status::Live, Status::Live, Status::Live],
+        [Status::Live, Status::Space, Status::Live],
       ],
       ShipType::I => [
-        [
-          Status::Space.as_char(),
-          Status::Live.as_char(),
-          Status::Space.as_char(),
-        ],
-        [
-          Status::Space.as_char(),
-          Status::Live.as_char(),
-          Status::Space.as_char(),
-        ],
-        [
-          Status::Space.as_char(),
-          Status::Live.as_char(),
-          Status::Space.as_char(),
-        ],
+        [Status::Space, Status::Live, Status::Space],
+        [Status::Space, Status::Live, Status::Space],
+        [Status::Space, Status::Live, Status::Space],
       ],
     };
 
@@ -755,53 +689,48 @@ mod tests {
     let mut rng = rand::thread_rng();
     assert!(get_random_coordinate(&mut rng, SHIP_SIZE) < (ROWS, COLS));
   }
+
   #[test]
   fn test_reverse_rows_of_cols() {
-    #[rustfmt::skip]
     let ship = [
-        ['*', '*', '-'],
-        ['-', '*', '-'],
-        ['-', '-', '*'],
+      [Status::Live, Status::Live, Status::Space],
+      [Status::Space, Status::Live, Status::Space],
+      [Status::Space, Status::Space, Status::Live],
     ];
-    #[rustfmt::skip]
     let expected = [
-        ['-', '-', '*'],
-        ['-', '*', '-'],
-        ['*', '*', '-'],
+      [Status::Space, Status::Space, Status::Live],
+      [Status::Space, Status::Live, Status::Space],
+      [Status::Live, Status::Live, Status::Space],
     ];
     assert_eq!(reverse_rows_of_cols(ship), expected);
   }
 
   #[test]
   fn test_reverse_cols_of_rows() {
-    #[rustfmt::skip]
     let ship = [
-        ['*', '*', '-'],
-        ['-', '*', '-'],
-        ['-', '-', '-'],
+      [Status::Live, Status::Live, Status::Space],
+      [Status::Space, Status::Live, Status::Space],
+      [Status::Space, Status::Space, Status::Space],
     ];
-    #[rustfmt::skip]
     let expected = [
-        ['-', '*', '*'],
-        ['-', '*', '-'],
-        ['-', '-', '-'],
+      [Status::Space, Status::Live, Status::Live],
+      [Status::Space, Status::Live, Status::Space],
+      [Status::Space, Status::Space, Status::Space],
     ];
     assert_eq!(reverse_cols_of_rows(ship), expected);
   }
 
   #[test]
   fn test_transpose() {
-    #[rustfmt::skip]
     let ship = [
-        ['*', '*', '-'],
-        ['-', '*', '-'],
-        ['-', '-', '-'],
+      [Status::Live, Status::Live, Status::Space],
+      [Status::Space, Status::Live, Status::Space],
+      [Status::Space, Status::Space, Status::Space],
     ];
-    #[rustfmt::skip]
     let expected = [
-        ['*', '-', '-'],
-        ['*', '*', '-'],
-        ['-', '-', '-'],
+      [Status::Live, Status::Space, Status::Space],
+      [Status::Live, Status::Live, Status::Space],
+      [Status::Space, Status::Space, Status::Space],
     ];
     assert_eq!(transpose(ship), expected);
   }
@@ -809,31 +738,39 @@ mod tests {
   #[test]
   fn test_ship_type_get_shape() {
     let ship = ShipType::H;
-    #[rustfmt::skip]
-    assert_eq!(ship.get_shape(90), [
-        ['*', '.', '*'],
-        ['*', '*', '*'],
-        ['*', '.', '*'],
-    ]);
-    #[rustfmt::skip]
-    assert_eq!(ship.get_shape(180), [
-        ['*', '*', '*'],
-        ['.', '*', '.'],
-        ['*', '*', '*'],
-    ]);
+    assert_eq!(
+      ship.get_shape(90),
+      [
+        [Status::Live, Status::Space, Status::Live],
+        [Status::Live, Status::Live, Status::Live],
+        [Status::Live, Status::Space, Status::Live],
+      ]
+    );
+    assert_eq!(
+      ship.get_shape(180),
+      [
+        [Status::Live, Status::Live, Status::Live],
+        [Status::Space, Status::Live, Status::Space],
+        [Status::Live, Status::Live, Status::Live],
+      ]
+    );
     let ship = ShipType::V;
-    #[rustfmt::skip]
-    assert_eq!(ship.get_shape(270), [
-        ['.', '*', '.'],
-        ['*', '.', '*'],
-        ['*', '.', '*'],
-    ]);
-    #[rustfmt::skip]
-    assert_eq!(ship.get_shape(360), [
-        ['*', '*', '.'],
-        ['.', '.', '*'],
-        ['*', '*', '.'],
-    ]);
+    assert_eq!(
+      ship.get_shape(270),
+      [
+        [Status::Space, Status::Live, Status::Space],
+        [Status::Live, Status::Space, Status::Live],
+        [Status::Live, Status::Space, Status::Live],
+      ]
+    );
+    assert_eq!(
+      ship.get_shape(360),
+      [
+        [Status::Live, Status::Live, Status::Space],
+        [Status::Space, Status::Space, Status::Live],
+        [Status::Live, Status::Live, Status::Space],
+      ]
+    );
   }
 
   #[test]
@@ -881,7 +818,7 @@ mod tests {
       })
       .collect::<Vec<_>>()
       .join("\n");
-    assert_eq!(p, "..........\n..........\n..........\n..........\n..........\n.....*.*..\n.....***..\n.....*.*..\n..........\n..........");
+    assert_eq!(p, "          \n          \n          \n          \n          \n     🚀 🚀  \n     🚀🚀🚀  \n     🚀 🚀  \n          \n          ");
     assert!(ship.is_overlapping(&positions, (5, 5)));
   }
 
@@ -890,7 +827,7 @@ mod tests {
     let opponent_board = Board::new(false);
 
     // should be empty board initially
-    assert_eq!(opponent_board.to_string(), "..........\n..........\n..........\n..........\n..........\n..........\n..........\n..........\n..........\n..........");
+    assert_eq!(opponent_board.to_string(), "          \n          \n          \n          \n          \n          \n          \n          \n          \n          ");
 
     let my_board = Board::new(true);
 
@@ -921,6 +858,17 @@ mod tests {
     board.positions[1][1].status = Status::Space;
     board.positions[3][3].status = Status::Live;
 
+    let mut shots = BTreeSet::new();
+    shots.insert((1, 1));
+    shots.insert((3, 3));
+
+    let (res, lost) = board.take_fire(&shots);
+    assert_eq!(res.get(&(1, 1)).unwrap(), &Status::Miss);
+    assert_eq!(res.get(&(3, 3)).unwrap(), &Status::Hit);
+    assert!(!lost);
+
+    let mut board = Board::new(true);
+
     // set a ship as hit except for one position
     let ship_id = board.ships[0].id.clone();
     let mut pos = board
@@ -931,17 +879,12 @@ mod tests {
       .collect::<Vec<_>>();
 
     pos.iter_mut().skip(1).for_each(|p| p.status = Status::Hit);
-
     let c = pos.iter().take(1).map(|p| p.coordinate).collect::<Vec<_>>();
 
     let mut shots = BTreeSet::new();
-    shots.insert((1, 1));
-    shots.insert((3, 3));
     shots.insert(c[0]);
 
     let (res, lost) = board.take_fire(&shots);
-    assert_eq!(res.get(&(1, 1)).unwrap(), &Status::Miss);
-    assert_eq!(res.get(&(3, 3)).unwrap(), &Status::Hit);
     assert_eq!(res.get(&c[0]).unwrap(), &Status::Kill);
     assert!(!lost);
   }

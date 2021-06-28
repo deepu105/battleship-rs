@@ -6,7 +6,7 @@ use std::{
 
 use termion::event::Key;
 use tui::{
-  style::{Color, Modifier, Style},
+  style::{Color, Style},
   widgets::{Block, BorderType, Borders},
 };
 
@@ -225,40 +225,26 @@ impl<'app> Cell<'app> {
     Block::default()
       .borders(Borders::ALL)
       .style(
-        Style::default()
-          .bg(Color::Black)
-          .fg(if self.is_active() {
-            Color::Cyan
-          } else if self.is_selected() {
-            Color::Yellow
-          } else {
-            let status = self.get_position_status();
-            match status {
-              Status::Live => Color::Green,
-              Status::Hit => Color::LightRed,
-              Status::Kill => Color::Red,
-              Status::Miss => Color::White,
-              Status::Space => Color::White,
-            }
-          })
-          .add_modifier(if self.is_active() {
-            Modifier::BOLD
-          } else {
-            Modifier::empty()
-          }),
+        // cell background and border color
+        Style::default().bg(Color::Black).fg(if self.is_selected() {
+          Color::Yellow
+        } else if self.is_active() {
+          Color::Cyan
+        } else {
+          let status = self.get_position_status();
+          match status {
+            Status::Live => Color::Yellow,
+            Status::Hit | Status::Kill => Color::Red,
+            Status::Miss | Status::Space => Color::White,
+          }
+        }),
       )
-      .border_type(BorderType::Plain)
+      .border_type(BorderType::Rounded)
   }
 
   pub fn text_style(&self) -> Style {
-    let status = self.get_position_status();
-    Style::default().bg(if status == Status::Space {
-      Color::White
-    } else if status == Status::Live {
-      Color::Green
-    } else {
-      Color::Black
-    })
+    // cell background color
+    Style::default().bg(Color::Black)
   }
 }
 
@@ -266,6 +252,6 @@ impl fmt::Display for Cell<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let status = self.get_position_status();
 
-    write!(f, "{}", status.as_emoji())
+    write!(f, "{}", status)
   }
 }
