@@ -62,7 +62,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 
   // show alerts
   if app.frame_count % 8 != 0 || app.is_won() {
-    draw_alert(f, app.message.clone(), v_chunks[1]);
+    draw_alert(f, app.message.clone(), f.size());
   } else {
     // reset messages
     app.message = String::default();
@@ -166,7 +166,7 @@ fn draw_board<B: Backend>(
 
 fn draw_alert<B: Backend>(f: &mut Frame<B>, message: String, area: Rect) {
   if !message.is_empty() {
-    let area = centered_rect(50, 4, area);
+    let area = top_centered_rect(50, 4, area);
     f.render_widget(Clear, area); //this clears out the background
     f.render_widget(
       Paragraph::new(message)
@@ -192,26 +192,17 @@ fn draw_alert<B: Backend>(f: &mut Frame<B>, message: String, area: Rect) {
   }
 }
 
-fn centered_rect(width: u16, height: u16, r: Rect) -> Rect {
+fn top_centered_rect(width: u16, height: u16, r: Rect) -> Rect {
   let Rect {
     width: grid_width,
     height: grid_height,
     ..
   } = r;
 
-  let outer_height = (grid_height / 2)
-    .checked_sub(height / 2)
-    .unwrap_or_default();
+  let outer_height = grid_height.checked_sub(height).unwrap_or_default();
   let popup_layout = Layout::default()
     .direction(Direction::Vertical)
-    .constraints(
-      [
-        Constraint::Length(outer_height),
-        Constraint::Length(height),
-        Constraint::Length(outer_height),
-      ]
-      .as_ref(),
-    )
+    .constraints([Constraint::Length(height), Constraint::Length(outer_height)].as_ref())
     .split(r);
 
   let outer_width = (grid_width / 2).checked_sub(width / 2).unwrap_or_default();
@@ -226,5 +217,5 @@ fn centered_rect(width: u16, height: u16, r: Rect) -> Rect {
       ]
       .as_ref(),
     )
-    .split(popup_layout[1])[1]
+    .split(popup_layout[0])[1]
 }
