@@ -5,7 +5,7 @@ A terminal battleship game in Rust.
 Run with docker:
 
 ```
-$ docker run --rm -it deepu105/battleship:latest
+$ docker run --rm -it deepu105/battleship:main
 ```
 
 ![demo](./demo.gif)
