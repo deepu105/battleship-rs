@@ -76,12 +76,12 @@ impl Game {
 
     let previous_shots = previous_shots
       .iter()
-      .filter(|p| p.status != Status::LIVE && p.status != Status::SPACE)
+      .filter(|p| p.status != Status::Live && p.status != Status::Space)
       .collect::<Vec<_>>();
 
     let previous_hits = previous_shots
       .iter()
-      .filter(|p| p.status == Status::HIT)
+      .filter(|p| p.status == Status::Hit)
       .collect::<Vec<_>>();
 
     while shots.len() < number_of_shots {
@@ -183,39 +183,39 @@ impl Game {
 
 #[derive(Ord, Eq, PartialEq, PartialOrd, Debug, Clone)]
 pub enum Status {
-  LIVE,
-  MISS,
-  HIT,
-  KILL,
-  SPACE,
+  Live,
+  Miss,
+  Hit,
+  Kill,
+  Space,
 }
 
 impl Status {
   pub fn as_char(&self) -> char {
     match *self {
-      Status::LIVE => '*',
-      Status::MISS => '-',
-      Status::HIT => 'X',
-      Status::KILL => 'K',
-      Status::SPACE => '.',
+      Status::Live => '*',
+      Status::Miss => '-',
+      Status::Hit => 'X',
+      Status::Kill => 'K',
+      Status::Space => '.',
     }
   }
   pub fn as_emoji(&self) -> &str {
     match *self {
-      Status::LIVE => "",
-      Status::MISS => "❌",
-      Status::HIT => "💥",
-      Status::KILL => "💀",
-      Status::SPACE => "",
+      Status::Live => "🚀",
+      Status::Miss => "❌",
+      Status::Hit => "💥",
+      Status::Kill => "💀",
+      Status::Space => "",
     }
   }
   pub fn from_char(c: char) -> Self {
     match c {
-      '*' => Status::LIVE,
-      '-' => Status::MISS,
-      'X' => Status::HIT,
-      'K' => Status::KILL,
-      '.' => Status::SPACE,
+      '*' => Status::Live,
+      '-' => Status::Miss,
+      'X' => Status::Hit,
+      'K' => Status::Kill,
+      '.' => Status::Space,
       _ => panic!("char is not a valid Status"),
     }
   }
@@ -354,7 +354,7 @@ impl Board {
     self
       .pos_by_ship(id)
       .into_iter()
-      .filter(|pc| pc.status == Status::LIVE)
+      .filter(|pc| pc.status == Status::Live)
       .collect::<Vec<_>>()
   }
 
@@ -362,14 +362,14 @@ impl Board {
     let mut response = BTreeMap::new();
     for shot in shots {
       let pos = self.positions[shot.0][shot.1].clone();
-      let mut status = Status::MISS;
-      if pos.status == Status::LIVE {
-        status = Status::HIT;
+      let mut status = Status::Miss;
+      if pos.status == Status::Live {
+        status = Status::Hit;
         if let Some(id) = &pos.ship_id {
           if self.alive_pos_by_ship(id.clone()).len() <= 1 {
             let ship = self.find_ship_mut(id.clone());
             if let Some(ship) = ship {
-              status = Status::KILL;
+              status = Status::Kill;
               ship.alive = false;
               let pos = self.pos_by_ship(id.clone());
               pos.iter().for_each(|p| {
@@ -379,7 +379,7 @@ impl Board {
           }
         }
       }
-      if pos.status != Status::HIT && pos.status != Status::KILL {
+      if pos.status != Status::Hit && pos.status != Status::Kill {
         self.positions[shot.0][shot.1].status = status.clone();
       }
       response.insert(*shot, status);
@@ -393,13 +393,13 @@ impl Board {
     let mut miss_count = 0;
     for (shot, status) in response {
       let mut pos = &mut self.positions[shot.0][shot.1];
-      if pos.status == Status::SPACE || pos.status == Status::LIVE || status == Status::KILL {
+      if pos.status == Status::Space || pos.status == Status::Live || status == Status::Kill {
         pos.status = status.clone();
       }
       match status {
-        Status::MISS => miss_count += 1,
-        Status::HIT => hit_count += 1,
-        Status::KILL => kill_count += 1,
+        Status::Miss => miss_count += 1,
+        Status::Hit => hit_count += 1,
+        Status::Kill => kill_count += 1,
         _ => {}
       }
     }
@@ -451,14 +451,14 @@ impl Position {
   fn new(coordinate: Coordinate) -> Self {
     Self {
       coordinate,
-      status: Status::SPACE,
+      status: Status::Space,
       ship_id: None,
     }
   }
 
   pub fn get_status(&self, ship: Option<&Ship>) -> Status {
     if ship.is_some() && !ship.unwrap().alive {
-      Status::KILL
+      Status::Kill
     } else {
       self.status.clone()
     }
@@ -504,7 +504,7 @@ impl Ship {
       for row in &self.shape() {
         let mut y = start_cord.1;
         for _ in row {
-          if positions[x][y].status == Status::LIVE {
+          if positions[x][y].status == Status::Live {
             ship_found = true;
           }
           y += 1;
@@ -524,8 +524,8 @@ impl Ship {
       for row in &shape {
         let mut y = start_cord.1;
         for col in row {
-          if Status::LIVE == Status::from_char(*col) {
-            positions[x][y].status = Status::LIVE;
+          if Status::Live == Status::from_char(*col) {
+            positions[x][y].status = Status::Live;
             positions[x][y].ship_id = Some(self.id.to_owned());
             ship_drawn = true
           }
@@ -553,70 +553,70 @@ impl ShipType {
     let shape = match *self {
       ShipType::X => [
         [
-          Status::LIVE.as_char(),
-          Status::SPACE.as_char(),
-          Status::LIVE.as_char(),
+          Status::Live.as_char(),
+          Status::Space.as_char(),
+          Status::Live.as_char(),
         ],
         [
-          Status::SPACE.as_char(),
-          Status::LIVE.as_char(),
-          Status::SPACE.as_char(),
+          Status::Space.as_char(),
+          Status::Live.as_char(),
+          Status::Space.as_char(),
         ],
         [
-          Status::LIVE.as_char(),
-          Status::SPACE.as_char(),
-          Status::LIVE.as_char(),
+          Status::Live.as_char(),
+          Status::Space.as_char(),
+          Status::Live.as_char(),
         ],
       ],
       ShipType::V => [
         [
-          Status::LIVE.as_char(),
-          Status::SPACE.as_char(),
-          Status::LIVE.as_char(),
+          Status::Live.as_char(),
+          Status::Space.as_char(),
+          Status::Live.as_char(),
         ],
         [
-          Status::LIVE.as_char(),
-          Status::SPACE.as_char(),
-          Status::LIVE.as_char(),
+          Status::Live.as_char(),
+          Status::Space.as_char(),
+          Status::Live.as_char(),
         ],
         [
-          Status::SPACE.as_char(),
-          Status::LIVE.as_char(),
-          Status::SPACE.as_char(),
+          Status::Space.as_char(),
+          Status::Live.as_char(),
+          Status::Space.as_char(),
         ],
       ],
       ShipType::H => [
         [
-          Status::LIVE.as_char(),
-          Status::SPACE.as_char(),
-          Status::LIVE.as_char(),
+          Status::Live.as_char(),
+          Status::Space.as_char(),
+          Status::Live.as_char(),
         ],
         [
-          Status::LIVE.as_char(),
-          Status::LIVE.as_char(),
-          Status::LIVE.as_char(),
+          Status::Live.as_char(),
+          Status::Live.as_char(),
+          Status::Live.as_char(),
         ],
         [
-          Status::LIVE.as_char(),
-          Status::SPACE.as_char(),
-          Status::LIVE.as_char(),
+          Status::Live.as_char(),
+          Status::Space.as_char(),
+          Status::Live.as_char(),
         ],
       ],
       ShipType::I => [
         [
-          Status::SPACE.as_char(),
-          Status::LIVE.as_char(),
-          Status::SPACE.as_char(),
+          Status::Space.as_char(),
+          Status::Live.as_char(),
+          Status::Space.as_char(),
         ],
         [
-          Status::SPACE.as_char(),
-          Status::LIVE.as_char(),
-          Status::SPACE.as_char(),
+          Status::Space.as_char(),
+          Status::Live.as_char(),
+          Status::Space.as_char(),
         ],
         [
-          Status::SPACE.as_char(),
-          Status::LIVE.as_char(),
-          Status::SPACE.as_char(),
+          Status::Space.as_char(),
+          Status::Live.as_char(),
+          Status::Space.as_char(),
         ],
       ],
     };
@@ -852,7 +852,7 @@ mod tests {
     positions[1][5] = Position {
       coordinate: (1, 5),
       ship_id: Some("123".into()),
-      status: Status::LIVE,
+      status: Status::Live,
     };
     // should fail when there is overlap
     assert!(ship.is_overlapping(&positions, (1, 5)));
@@ -918,8 +918,8 @@ mod tests {
   fn test_board_take_fire() {
     let mut board = Board::new(true);
 
-    board.positions[1][1].status = Status::SPACE;
-    board.positions[3][3].status = Status::LIVE;
+    board.positions[1][1].status = Status::Space;
+    board.positions[3][3].status = Status::Live;
 
     // set a ship as hit except for one position
     let ship_id = board.ships[0].id.clone();
@@ -930,7 +930,7 @@ mod tests {
       .filter(|pc| pc.ship_id.is_some() && pc.ship_id.clone().unwrap() == ship_id)
       .collect::<Vec<_>>();
 
-    pos.iter_mut().skip(1).for_each(|p| p.status = Status::HIT);
+    pos.iter_mut().skip(1).for_each(|p| p.status = Status::Hit);
 
     let c = pos.iter().take(1).map(|p| p.coordinate).collect::<Vec<_>>();
 
@@ -940,9 +940,9 @@ mod tests {
     shots.insert(c[0]);
 
     let (res, lost) = board.take_fire(&shots);
-    assert_eq!(res.get(&(1, 1)).unwrap(), &Status::MISS);
-    assert_eq!(res.get(&(3, 3)).unwrap(), &Status::HIT);
-    assert_eq!(res.get(&c[0]).unwrap(), &Status::KILL);
+    assert_eq!(res.get(&(1, 1)).unwrap(), &Status::Miss);
+    assert_eq!(res.get(&(3, 3)).unwrap(), &Status::Hit);
+    assert_eq!(res.get(&c[0]).unwrap(), &Status::Kill);
     assert!(!lost);
   }
 
@@ -951,16 +951,16 @@ mod tests {
     let mut board = Board::new(false);
 
     let mut res = BTreeMap::new();
-    res.insert((1, 1), Status::MISS);
-    res.insert((3, 3), Status::HIT);
-    res.insert((0, 2), Status::KILL);
+    res.insert((1, 1), Status::Miss);
+    res.insert((3, 3), Status::Hit);
+    res.insert((0, 2), Status::Kill);
 
     let message = board.update_status(res, false);
     assert_eq!(message, "You have sunk a ship. You missed 1.");
 
     let mut res = BTreeMap::new();
-    res.insert((3, 3), Status::HIT);
-    res.insert((0, 2), Status::HIT);
+    res.insert((3, 3), Status::Hit);
+    res.insert((0, 2), Status::Hit);
 
     let message = board.update_status(res.clone(), false);
     assert_eq!(message, "You have 2 hit.");

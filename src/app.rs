@@ -234,11 +234,11 @@ impl<'app> Cell<'app> {
           } else {
             let status = self.get_position_status();
             match status {
-              Status::LIVE => Color::Green,
-              Status::HIT => Color::LightRed,
-              Status::KILL => Color::Red,
-              Status::MISS => Color::White,
-              Status::SPACE => Color::White,
+              Status::Live => Color::Green,
+              Status::Hit => Color::LightRed,
+              Status::Kill => Color::Red,
+              Status::Miss => Color::White,
+              Status::Space => Color::White,
             }
           })
           .add_modifier(if self.is_active() {
@@ -252,9 +252,9 @@ impl<'app> Cell<'app> {
 
   pub fn text_style(&self) -> Style {
     let status = self.get_position_status();
-    Style::default().bg(if status == Status::SPACE {
+    Style::default().bg(if status == Status::Space {
       Color::White
-    } else if status == Status::LIVE {
+    } else if status == Status::Live {
       Color::Green
     } else {
       Color::Black
