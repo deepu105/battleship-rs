@@ -1,4 +1,4 @@
-# BattleShip.rs
+# Battleship.rs
 
 A terminal battleship game in Rust.
 
