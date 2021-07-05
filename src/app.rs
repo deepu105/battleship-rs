@@ -136,21 +136,11 @@ impl App {
 
   pub fn on_key(&mut self, key: Key) {
     match key {
-      Key::Up | Key::Char('k') => {
-        self.on_up();
-      }
-      Key::Down | Key::Char('j') => {
-        self.on_down();
-      }
-      Key::Left | Key::Char('h') => {
-        self.on_left();
-      }
-      Key::Right | Key::Char('l') => {
-        self.on_right();
-      }
-      Key::Char(' ') => {
-        self.on_select();
-      }
+      Key::Up | Key::Char('k') => self.on_up(),
+      Key::Down | Key::Char('j') => self.on_down(),
+      Key::Left | Key::Char('h') => self.on_left(),
+      Key::Right | Key::Char('l') => self.on_right(),
+      Key::Char(' ') => self.on_select(),
       Key::Char('\n') => self.on_fire(),
       _ => { /* do nothing */ }
     }
@@ -206,39 +196,30 @@ impl<'app> Cell<'app> {
   }
 
   fn is_active(&self) -> bool {
-    if self.read_only {
-      false
-    } else {
-      self.app.active() == self.coordinate
-    }
+    !self.read_only && self.app.active() == self.coordinate
   }
 
   fn is_selected(&self) -> bool {
-    if self.read_only {
-      false
-    } else {
-      self.app.is_selected(self.coordinate)
-    }
+    !self.read_only && self.app.is_selected(self.coordinate)
   }
 
   pub fn block(&self) -> Block {
     Block::default()
       .borders(Borders::ALL)
-      .style(
-        // cell background and border color
-        Style::default().bg(Color::Black).fg(if self.is_selected() {
+      .style(Style::default().bg(Color::Black).fg(
+        // cell  border color
+        if self.is_selected() {
           Color::Yellow
         } else if self.is_active() {
           Color::Cyan
         } else {
-          let status = self.get_position_status();
-          match status {
+          match self.get_position_status() {
             Status::Live => Color::Yellow,
             Status::Hit | Status::Kill => Color::Red,
             Status::Miss | Status::Space => Color::White,
           }
-        }),
-      )
+        },
+      ))
       .border_type(BorderType::Rounded)
   }
 
@@ -250,8 +231,6 @@ impl<'app> Cell<'app> {
 
 impl fmt::Display for Cell<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let status = self.get_position_status();
-
-    write!(f, "{}", status)
+    write!(f, "{}", self.get_position_status())
   }
 }

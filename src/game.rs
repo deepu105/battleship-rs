@@ -58,11 +58,7 @@ impl Game {
     &mut self.players[turn]
   }
 
-  fn player_by_turn(&self, turn: usize) -> &Player {
-    &self.players[turn]
-  }
-
-  fn generate_firing_coordinates(&self) -> BTreeSet<Coordinate> {
+  fn generate_bot_firing_coordinates(&self) -> BTreeSet<Coordinate> {
     let mut rng = rand::thread_rng();
 
     let number_of_shots = match self.rule {
@@ -76,7 +72,7 @@ impl Game {
 
     let mut shots = BTreeSet::new();
 
-    let previous_shots = self.player_by_turn(self.turn).opponent_board().positions();
+    let previous_shots = self.computer().opponent_board().positions();
 
     let previous_shots = previous_shots
       .iter()
@@ -151,7 +147,7 @@ impl Game {
   }
 
   pub fn bot_fire(&mut self) -> String {
-    let shots = self.generate_firing_coordinates();
+    let shots = self.generate_bot_firing_coordinates();
     self.fire(&shots, true)
   }
 
@@ -667,17 +663,17 @@ mod tests {
   fn test_game_generate_firing_coordinates() {
     let game = Game::new(Rule::Default, Difficulty::Easy);
 
-    let shots = game.generate_firing_coordinates();
+    let shots = game.generate_bot_firing_coordinates();
     assert_eq!(shots.len(), 1);
 
     let game = Game::new(Rule::Charge, Difficulty::Easy);
 
-    let shots = game.generate_firing_coordinates();
+    let shots = game.generate_bot_firing_coordinates();
     assert_eq!(shots.len(), 1);
 
     let game = Game::new(Rule::Fury, Difficulty::Easy);
 
-    let shots = game.generate_firing_coordinates();
+    let shots = game.generate_bot_firing_coordinates();
     assert_eq!(shots.len(), 4);
   }
 
