@@ -9,7 +9,7 @@ dependencies = [
  "rand",
  "ratatui",
  "structopt",
- "termion 1.5.6",
+ "termion",
  "uuid",
 ]
 
@@ -115,7 +115,7 @@ checksum = "3af92c55d7d839293953fcd0fda5ecfe93297cfde6ffbdec13b41d99c0ba6607"
 dependencies = [
  "bitflags 2.6.0",
  "libc",
- "redox_syscall 0.4.1",
+ "redox_syscall",
 ]
 
 [[package]]
@@ -230,18 +230,9 @@ dependencies = [
  "itertools",
  "paste",
  "strum",
- "termion 2.0.3",
+ "termion",
  "unicode-segmentation",
  "unicode-width",
-]
-
-[[package]]
-name = "redox_syscall"
-version = "0.2.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "742739e41cd49414de871ea5e549afb7e2a3ac77b589bcbebe8c82fab37147fc"
-dependencies = [
- "bitflags 1.2.1",
 ]
 
 [[package]]
@@ -331,18 +322,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
-]
-
-[[package]]
-name = "termion"
-version = "1.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "077185e2eac69c3f8379a4298e1e07cd36beb962290d4a51199acf0fdc10607e"
-dependencies = [
- "libc",
- "numtoa",
- "redox_syscall 0.2.8",
- "redox_termios",
 ]
 
 [[package]]
