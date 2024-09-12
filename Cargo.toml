@@ -17,7 +17,7 @@ exclude = ["assets/*", ".github", "Makefile.toml", "CONTRIBUTING.md", "*.log", "
 
 [dependencies]
 tui = { package = "ratatui", version = "0.23", default-features = false, features = ['termion'] }
-termion = "1.5"
+termion = "2.0"
 rand = "0.8"
 uuid = { version = "0.8", features = ["v4"]}
 structopt = { version = "0.3", default-features = false }
